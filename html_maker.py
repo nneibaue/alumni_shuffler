@@ -1,3 +1,5 @@
+'''Utilities for generating HTML from Python.'''
+
 class HtmlMaker:
   default_style = {
         'table': {
@@ -65,7 +67,7 @@ class HtmlMaker:
 
   def apply_tag(self, enclosing_tag, css_classes=None):
     '''Wraps everything in `enclosing_tag`.'''
-    html = self.to_html().data
+    html = self.to_html()
     self._elements = []
     self.add_html_element(html, enclosing_tag=enclosing_tag, css_classes=css_classes)
 
@@ -118,7 +120,7 @@ class HtmlMaker:
     '''Adds another html maker to this maker'''
     if not isinstance(maker, HtmlMaker):
       raise TypeError('{maker} is not an instances of HtmlMaker. Try using `add_html_element` instead.')
-    html = maker.to_html().data
+    html = maker.to_html()
     self.add_html_element(html, enclosing_tag=enclosing_tag, css_classes=css_classes)
 
   def add_html_element(self, data,
@@ -168,4 +170,4 @@ class HtmlMaker:
     # Add css
     self._elements.insert(0, self._to_css_style())
     html = (''.join(self._elements))
-    return HTML(html)
+    return html
