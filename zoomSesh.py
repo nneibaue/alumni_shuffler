@@ -2,11 +2,10 @@ import pandas as pd
 import numpy as np
 import random
 import os
-from google.colab import drive, widgets
 from IPython.display import display, HTML
 from itertools import combinations
-drive.mount('/content/gdrive')
-NAMES_DIR = '/content/gdrive/My Drive/software_development/alumni_shuffler/names'
+
+NAMES_DIR = './names'
 
 def import_names(dir):
   name_files = [f for f in os.listdir(NAMES_DIR) if f.startswith('yob')]
@@ -249,110 +248,3 @@ class ZoomSesh:
           prev_combos.append(combo)
 
     return extras, prev_combos
-
-
-  def summary_html(self):
-    years = dict(self.alumni.year.value_counts())
-    tracks = dict(self.alumni.track.value_counts())
-
-    #css for table
-    style = '''
-    table {
-      border: 1px solid black;
-      width: auto;
-      padding:5px;
-    }
-
-    .pandas-table {
-      display:inline-block;
-      border: 10px solid black;
-      width: 20%;
-      padding:10px;
-    }
-
-    th, td, {
-      padding: 5px;
-      text-align: left;
-      border: 1px solid #ddd
-    }
-
-    .grid-container {
-      display: grid;
-      grid-template-columns: 25% 75%;
-      background-color: #007030;
-      padding: 10px;
-    }
-
-    .grid-item {
-      background-color: rgba(255, 255, 255);
-      border: 1px solid rgba(0, 0, 0, 0.8);
-      padding: 10px;
-      font-size: 12px;
-      text-align: center;
-      }
-
-      .left {
-        grid-column-start: 1;
-        grid-column-end: 2;
-      }
-      .right {
-        grid-column-start: 2
-      }
-
-
-    span.inlineTable {
-      display: inline-block;
-      vertical-align: text-top;
-      padding: 5px;
-    }
-    '''
-    def split_alumni():
-      alumni = self.alumni[['name', 'year', 'track']]
-      l = len(alumni)
-      if l % 10 == 0:
-        N = l // 10
-      else:
-        N = 1 + (l // 10)
-      groups = [alumni[10*n:10*(n + 1)].to_html(classes="pandas-table", border=5) for n in range(0, N)]
-      return groups
-
-    row = lambda entry: f'<tr>{entry}</tr>'
-    row_entries = lambda d: ''.join([
-                    row(f'<td>{key}</td><td>{value}</td>') for key, value in d.items()])
-    header = lambda attr: row(f'<th>{attr}</th><th>count</th>')
-
-    year_table = f'''<table>
-                     <caption>Years</caption>
-                     {header("year")}{row_entries(years)}
-                     </table>'''
-    track_table = f'''<table>
-                     <caption>Tracks</caption>
-                     {header("track")}{row_entries(tracks)}
-                     </table>'''
-
-    html = '''
-    <head>
-      <style>{style}</style>
-    </head>
-    <body>
-      <div class="grid-container">
-        <div class="grid-item left">
-          <h2>Total Attendees: {n}</h2>
-          <span class="inlineTable">
-            {year_table}
-          </span>
-          <span class="inlineTable">
-            {track_table}
-          </span>
-        </div>
-        <div class="grid-item right">
-          {alumni}
-        </div>
-      </div>
-    </body>'''
-    return HTML(html.format(n=len(self.alumni),
-                            style=style,
-                            year_table=year_table,
-                            track_table=track_table,
-                            alumni=''.join(split_alumni())
-                            ))
