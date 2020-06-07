@@ -114,6 +114,7 @@ class ZoomSesh:
       return {}
 
     keys = [f'group{counter}' for counter in range(1,len(all_groups)+1)]
+    all_groups = [list(g) for g in all_groups]
     breakout_dict = dict(zip(keys,all_groups))
     breakout_dict['extras'] = all_extras
 
