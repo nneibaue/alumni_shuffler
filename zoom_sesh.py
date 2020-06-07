@@ -5,7 +5,12 @@ import os
 from itertools import combinations
 from html_maker import HtmlMaker
 
-NAMES_DIR = './names'
+COLAB_ROOT = '/content'
+
+if os.getcwd() == COLAB_ROOT:  # In Colab
+  NAMES_DIR = os.path.join(COLAB_ROOT, 'alumni_shuffler', 'names')
+else:  # On local machine
+  NAMES_DIR = './names'
 
 def import_names(dir):
   name_files = [f for f in os.listdir(NAMES_DIR) if f.startswith('yob')]
