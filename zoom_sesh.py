@@ -5,6 +5,7 @@ import os
 from itertools import combinations
 from timeit import default_timer as timer
 from html_maker import HtmlMaker
+import aslogging as logging
 
 COLAB_ROOT = '/content'
 
@@ -140,6 +141,9 @@ class ZoomSesh:
       combos: a tuple of alumni indices for this group
     '''
 
+    logging.log('Begin _min_combo <========================================')
+    logging.log(f'size={len(alumni)}, by="{by}", arg="{arg}", group_size={group_size}')
+
     if by == 'all' or arg == 'diff':
       indices = alumni.index
     else:
@@ -159,7 +163,7 @@ class ZoomSesh:
         return 1    
       combos = temp_combos
       diff_end = timer()
-      print(f'Diff time: {diff_end-diff_start}')
+      logging.log(f'Diff time: {diff_end-diff_start}')
 
     twoDmask = [[(str(alumn), str(alumn)+'_cnsctv') for alumn in combos[i]] for i in range(len(combos))]
     masks = [[item for combo in twoDmask[i] for item in combo] for i in range(len(twoDmask))]
@@ -168,7 +172,8 @@ class ZoomSesh:
     sums = [np.sum(alumni.loc[alumni.index.isin(combos[i]),masks[i]].values) for i in range(len(combos))] ### HIGHEST COST STEP
     end = timer()
 
-    print(f'Time through highest cost step: {end-start}')
+    logging.log(f'Time through highest cost step: {end-start}')
+    logging.log('End _min_combo ========================================>')
 
     min_list = np.where(sums == np.amin(sums))[0]
   
@@ -250,7 +255,7 @@ class ZoomSesh:
 
       while_stop = timer()
 
-      print(f'Time through while: {while_stop - while_start}')
+      logging.log(f'Time through while: {while_stop - while_start}')
 
     return extras, prev_combos
 
