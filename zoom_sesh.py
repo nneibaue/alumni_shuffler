@@ -2,9 +2,9 @@ import pandas as pd
 import numpy as np
 import random
 import os
-from IPython.display import display, HTML
 from itertools import combinations
 from timeit import default_timer as timer
+from html_maker import HtmlMaker
 
 NAMES_DIR = './names'
 
@@ -120,6 +120,7 @@ class ZoomSesh:
     return breakout_dict
 
 
+  # TODO: Fill out this docstring
   def _min_combo(self, alumni, by=None, arg=None, group_size=6):
     '''Creates a random group that minimizes overlap with alumni in previous breakouts.    
 
@@ -246,3 +247,75 @@ class ZoomSesh:
       print(f'Time through while: {while_stop - while_start}')
 
     return extras, prev_combos
+
+  def summary_html(self):
+    years = dict(self.alumni.year.value_counts())
+    tracks = dict(self.alumni.track.value_counts())
+
+    def split_alumni():
+      alumni = self.alumni[['name', 'year', 'track']]
+      l = len(alumni)
+      if l % 10 == 0:
+        N = l // 10
+      else:
+        N = 1 + (l // 10)
+      groups = [alumni[10*n:10*(n + 1)] for n in range(0, N)]
+      return groups
+
+    def get_counts_df(attr):
+      counts_df =  pd.DataFrame(self.alumni[attr].value_counts()).reset_index()
+      counts_df.columns = [attr, 'count']
+      return counts_df
+
+    year_counts = get_counts_df('year')
+    track_counts = get_counts_df('track')
+
+    left = HtmlMaker()
+    left.add_html_element(f'<h2>Total Attendees: {len(self.alumni)}</h2>')
+    left.apply_style({
+        'td.summary': {
+            'padding': '5px',
+            'text-align': 'left',
+            'border-bottom': '1px solid #ddd'
+        },
+        'table': {
+            'border': '2px solid black',
+        }
+    })
+
+    # Shorthand for making tables display inline
+    htable = {'enclosing_tag': 'div', 'css_classes': ['horizontal-table']}
+
+    left.add_pandas_df(year_counts, td_class='summary',
+                       include_header=True, **htable)
+    left.add_pandas_df(track_counts, td_class='summary',
+                       include_header=True, **htable)
+    right = HtmlMaker()
+    for group in split_alumni():
+      right.add_pandas_df(group, td_class='summary',
+                          include_header=True, **htable)
+
+    summary = HtmlMaker()
+    summary.apply_style({
+        'div.greenbox': {
+            'border': '3px solid green',
+            'display': 'inline-block'
+        }
+    })
+
+    summary.apply_style({
+        'span': {
+            'display': 'inline-block',
+            'padding': '20px',
+        },
+        'span.left': {
+            'float': 'left',
+        },
+        'span.right': {
+            'float': 'right',
+        }
+    })
+    summary.add_html_maker(left, enclosing_tag='span', css_classes=['left'])
+    summary.add_html_maker(right, enclosing_tag='span', css_classes=['right'])
+    summary.apply_tag('div', css_classes=['greenbox'])
+    return summary.to_html()
