@@ -4,6 +4,7 @@ import random
 import os
 from IPython.display import display, HTML
 from itertools import combinations
+from timeit import default_timer as timer
 
 NAMES_DIR = './names'
 
@@ -18,7 +19,6 @@ def make_fake_data(max_people=40):
   years = list(map(str, range(2013, 2020)))
   df.columns = ['name', 'year', 'track']
   df['track'] = [random.choice(track_names) for _ in range(len(df))]
-  #df['track'] = ['polymer' for _ in range(len(df))] <- previously used a polymer only array for testing purposes
   df['year'] = [random.choice(years) for _ in range(len(df))]
 
   df = df.iloc[:max_people]  
@@ -113,13 +113,9 @@ class ZoomSesh:
       print("Invalid breakout input")
       return {}
 
-    breakout_dict = {}
+    keys = [f'group{counter}' for counter in range(1,len(all_groups)+1)]
+    breakout_dict = dict(zip(keys,all_groups))
     breakout_dict['extras'] = all_extras
-    group_counter = 0
-
-    for group in all_groups:
-      group_counter += 1
-      breakout_dict[f'group{group_counter}'] = group
 
     return breakout_dict
 
@@ -146,6 +142,7 @@ class ZoomSesh:
 
     #!!! Current diff is only for year OR track. Full diff (each group member has different year and different track) not implemented yet
     if arg == 'diff':
+      diff_start = timer()
       temp_combos = []
       for combo in combos:
         vals = alumni.loc[alumni.index.isin(combo),by]
@@ -154,23 +151,18 @@ class ZoomSesh:
       if len(temp_combos) == 0:
         return 1    
       combos = temp_combos
+      diff_end = timer()
+      print(f'Diff time: {diff_end-diff_start}')
 
-    sums = []
+    twoDmask = [[(str(alumn), str(alumn)+'_cnsctv') for alumn in combos[i]] for i in range(len(combos))]
+    masks = [[item for combo in twoDmask[i] for item in combo] for i in range(len(twoDmask))]
 
+    start = timer()
+    sums = [np.sum(alumni.loc[alumni.index.isin(combos[i]),masks[i]].values) for i in range(len(combos))] ### HIGHEST COST STEP
+    end = timer()
 
-    for combo in combos:
-      temp_sum = 0
+    print(f'Time through highest cost step: {end-start}')
 
-      for i in combo:
-        twoD_mask = [(col,col+"_cnsctv") for col in list(map(str,combo)) if col != str(i)]
-        mask = [col for sub_col in twoD_mask for col in sub_col]
-        line = alumni[alumni.index == i][mask]
-        temp_sum += np.sum(line.values)
-
-      sums.append(temp_sum)
-
-
-    sums = np.array(sums)
     min_list = np.where(sums == np.amin(sums))[0]
   
     return combos[random.choice(min_list)]
@@ -204,6 +196,8 @@ class ZoomSesh:
     end_of_split = False
 
     while(True):
+      while_start = timer()
+
       flat_prev_combos = [item for combo in prev_combos for item in combo]
       current_df = alumni[~alumni.index.isin(flat_prev_combos)]
 
@@ -246,5 +240,9 @@ class ZoomSesh:
           alumni.loc[~alumni.index.isin(combo), mask] = 0 
 
           prev_combos.append(combo)
+
+      while_stop = timer()
+
+      print(f'Time through while: {while_stop - while_start}')
 
     return extras, prev_combos
