@@ -59,7 +59,6 @@ class ZoomSesh:
     '''
     if filename == 'development':
       self._alumni_history = [make_fake_data(max_people=max_people)]
-      raise NotImplementedError('This feature is not ready yet')
     
     else:
       self._alumni_history = [import_alumni_data(filename)]
