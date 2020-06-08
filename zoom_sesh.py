@@ -96,7 +96,7 @@ class ZoomSesh:
 
     '''
     alumni = self.alumni
-    if diff:
+    if diff and by != 'all':
       all_extras, all_groups = self._group_split(by, 'diff', group_size)
 
     elif by in list(alumni.keys()):
