@@ -21,8 +21,8 @@ def import_random_names(dir):
 
 def _create_tracking_cols(df):
   for i in df.index:
-    df[i] = np.zeros(len(df))
-    df[i+"_cnsctv"] = np.zeros(len(df))
+    df[f'{i}'] = np.zeros(len(df))
+    df[f{'{i}_cnsctv'] = np.zeros(len(df))
     return df
   
 def import_alumni_data(fname):
