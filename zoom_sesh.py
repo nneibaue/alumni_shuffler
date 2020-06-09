@@ -15,15 +15,16 @@ else:  # On local machine
   NAMES_DIR = './names'
   
 def import_random_names(dir):
-  name_files = [f for f in os.listdir(NAMES_DIR) if f.startswith('yob')]
+  name_files = [f for f in os.listdir(dir) if f.startswith('yob')]
   df = pd.read_csv(os.path.join(dir, name_files[0]))
+  print('len after import random names: ', len(df))
   return df
 
 def _create_tracking_cols(df):
   for i in df.index:
     df[f'{i}'] = np.zeros(len(df))
     df[f'{i}_cnsctv'] = np.zeros(len(df))
-    return df
+  return df
   
 def import_alumni_data(fname):
   df = pd.read_excel(fname)
@@ -39,9 +40,9 @@ def make_fake_data(max_people=40):
 
   person_id = list(map(str,np.arange(max_people).tolist()))
 
-  df = _create_tracking_cols(df)
+  df = _create_tracking_cols(df.iloc[:max_people])
 
-  return df.iloc[:max_people]
+  return df
 
 class ZoomSesh:
   '''Object that helps organize large groups of people during a zoom call.'''
