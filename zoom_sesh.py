@@ -37,7 +37,6 @@ def make_fake_data(max_people=40):
   df['track'] = [random.choice(track_names) for _ in range(len(df))]
   df['year'] = [random.choice(years) for _ in range(len(df))]
 
-  df = df.iloc[:max_people]  
   person_id = list(map(str,np.arange(max_people).tolist()))
 
   df = _create_tracking_cols(df)
