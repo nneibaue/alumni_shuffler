@@ -298,7 +298,7 @@ class ZoomSesh:
 
   def summary_html(self):
     years = dict(self._alumni_data.year.value_counts())
-    tracks = dict(self._alumni_a.track.value_counts())
+    tracks = dict(self._alumni_data.track.value_counts())
 
     def split_alumni():
       alumni = self._alumni_data[['name', 'year', 'track']]
