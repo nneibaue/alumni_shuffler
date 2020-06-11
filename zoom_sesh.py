@@ -6,6 +6,7 @@ from itertools import combinations
 from timeit import default_timer as timer
 from html_maker import HtmlMaker
 import aslogging as logging
+import shutil
 
 COLAB_ROOT = '/content'
 
@@ -17,10 +18,9 @@ else:  # On local machine
 def import_random_names(dir):
   name_files = [f for f in os.listdir(dir) if f.startswith('yob')]
   df = pd.read_csv(os.path.join(dir, name_files[0]))
-  print('len after import random names: ', len(df))
   return df
 
-def make_fake_data(max_people=40):
+def make_fake_data(dir_name, max_people=40, overwrite=True):
   df = import_random_names(NAMES_DIR)
   track_names = ['optics', 'semi', 'polymer', 'sensors']
   years = list(map(str, range(2013, 2020)))
@@ -30,9 +30,20 @@ def make_fake_data(max_people=40):
 
   person_id = list(map(str,np.arange(max_people).tolist()))
 
-  df = ZoomSesh._create_tracking_cols(df.iloc[:max_people])
+  #df = ZoomSesh._create_tracking_cols(df.iloc[:max_people])
+  if os.path.isdir(dir_name):
+    if overwrite:
+      shutil.rmtree(dir_name)
+    else:
+      raise ValueError(f'{dir_name} already exists! Please set `overwrite` to `False`')
+  else:
+    os.mkdir(dir_name)
 
-  return df
+  w = pd.ExcelWriter(f'{dir_name}/alumni.xlsx')
+  df.iloc[:max_people].to_excel(w)
+  w.save()
+  w.close()
+
 
 class ZoomSesh:
   '''Object that helps organize large groups of people during a zoom call.'''
