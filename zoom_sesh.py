@@ -61,8 +61,8 @@ class ZoomSesh:
       
     self._alumni_file = os.path.join(session_directory, 'alumni.xlsx')
     self._session_directory = session_directory
-    self._alumni_data = pd.read_excel(self._alumni_file) # DataFrame with raw data from alumni file
-    self._alumni_history = [ZoomSesh._create_tracking_cols(self._alumni_data)]
+    self._alumni_data = self._create_tracking_cols(pd.read_excel(self._alumni_file)) # DataFrame with raw data from alumni file
+    self._alumni_history = []
     self._breakout_history = []
 
     # Attributes for this zoom session. These are taken from the column names of the alumni file
@@ -78,10 +78,8 @@ class ZoomSesh:
       df[f'{i}_cnsctv'] = np.zeros(len(df))
     return df
 
-  @property
   def alumni(self):
-    '''Returns 'current' alumni matrix, which is the top matrix in the stack.'''
-    return self._alumni_history[0]
+    return self._alumni.copy()
 
   # Core algorithm
   # ====================================================
@@ -118,7 +116,7 @@ class ZoomSesh:
         the breakout number.
 
     '''
-    alumni = self.alumni
+    alumni = self._alumni_data
     if diff and by != 'all':
       all_extras, all_groups = self._group_split(by, 'diff', group_size)
 
@@ -148,6 +146,7 @@ class ZoomSesh:
     breakout_dict['extras'] = all_extras
 
     self._breakout_history.append(breakout_dict)
+    self._alumni_history.append(self._alumni_data.copy())
     return breakout_dict
 
 
@@ -228,7 +227,7 @@ class ZoomSesh:
 
     prev_combos = []
     extras = []
-    alumni = self.alumni
+    alumni = self._alumni_data
     end_of_split = False
 
     while(True):
@@ -291,18 +290,18 @@ class ZoomSesh:
     
     writer = pd.ExcelWriter(os.path.join(self._session_directory, f'breakout{i}.xlsx'), engine='openpyxl')
     for group in b:
-      df = self.alumni[self.attributes].iloc[b[group]]
+      df = self._alumni_data[self.attributes].iloc[b[group]]
       df.to_excel(writer, sheet_name=group)
     
     writer.save()
     writer.close()
 
   def summary_html(self):
-    years = dict(self.alumni.year.value_counts())
-    tracks = dict(self.alumni.track.value_counts())
+    years = dict(self._alumni_data.year.value_counts())
+    tracks = dict(self._alumni_a.track.value_counts())
 
     def split_alumni():
-      alumni = self.alumni[['name', 'year', 'track']]
+      alumni = self._alumni_data[['name', 'year', 'track']]
       l = len(alumni)
       if l % 10 == 0:
         N = l // 10
@@ -312,7 +311,7 @@ class ZoomSesh:
       return groups
 
     def get_counts_df(attr):
-      counts_df =  pd.DataFrame(self.alumni[attr].value_counts()).reset_index()
+      counts_df =  pd.DataFrame(self._alumni_data[attr].value_counts()).reset_index()
       counts_df.columns = [attr, 'count']
       return counts_df
 
@@ -320,7 +319,7 @@ class ZoomSesh:
     track_counts = get_counts_df('track')
 
     left = HtmlMaker()
-    left.add_html_element(f'<h2>Total Attendees: {len(self.alumni)}</h2>')
+    left.add_html_element(f'<h2>Total Attendees: {len(self._alumni_data)}</h2>')
     left.apply_style({
         'td.summary': {
             'padding': '5px',
