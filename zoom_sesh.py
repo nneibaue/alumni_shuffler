@@ -83,17 +83,15 @@ class ZoomSesh:
 
   # Core algorithm
   # ====================================================
-  def breakout(self, by, group_size, diff=False, n=None):
+  def breakout(self, by, group_size, diff=False, autosave=True):
     '''Generates a single breakout group based on the current state.
     
     Args:
       by: string identifier to use for combining alumni
       same: bool saying whether to combine alumni based on similaritis
         (same=True) or differences (same=False).
-      group_size: tuple specifying range of acceptable group sizes
-      n: number of subsequent breakouts. if n=None, then will return the min
-        number of breakouts required for everyone to see everyone else according
-        to `by` and `same`. 
+      group_size: integer. Desired group size
+      autosave: bool. Whether or not to save the breakouts to excel automatically
 
     Examples:
 
@@ -147,6 +145,8 @@ class ZoomSesh:
 
     self._breakout_history.append(breakout_dict)
     self._alumni_history.append(self._alumni_data.copy())
+    if autosave:
+      self.save_breakout(len(self._breakout_history))
     return breakout_dict
 
 
