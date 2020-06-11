@@ -80,7 +80,7 @@ class ZoomSesh:
 
   @property
   def alumni(self):
-    return self._alumni.copy()
+    return self._alumni_data.copy()
 
   # Core algorithm
   # ====================================================
