@@ -14,32 +14,40 @@ if os.getcwd() == COLAB_ROOT:  # In Colab
 else:  # On local machine
   NAMES_DIR = './names'
   
-def import_names(dir):
-  name_files = [f for f in os.listdir(NAMES_DIR) if f.startswith('yob')]
+def import_random_names(dir):
+  name_files = [f for f in os.listdir(dir) if f.startswith('yob')]
   df = pd.read_csv(os.path.join(dir, name_files[0]))
+  print('len after import random names: ', len(df))
   return df
 
+def _create_tracking_cols(df):
+  for i in df.index:
+    df[f'{i}'] = np.zeros(len(df))
+    df[f'{i}_cnsctv'] = np.zeros(len(df))
+  return df
+  
+def import_alumni_data(fname):
+  df = pd.read_excel(fname)
+  return _create_tracking_cols(df)
+
 def make_fake_data(max_people=40):
-  df = import_names(NAMES_DIR)
+  df = import_random_names(NAMES_DIR)
   track_names = ['optics', 'semi', 'polymer', 'sensors']
   years = list(map(str, range(2013, 2020)))
   df.columns = ['name', 'year', 'track']
   df['track'] = [random.choice(track_names) for _ in range(len(df))]
   df['year'] = [random.choice(years) for _ in range(len(df))]
 
-  df = df.iloc[:max_people]  
   person_id = list(map(str,np.arange(max_people).tolist()))
 
-  for i in person_id:
-    df[i] = np.zeros(len(df))
-    df[i+"_cnsctv"] = np.zeros(len(df))
+  df = _create_tracking_cols(df.iloc[:max_people])
 
-  return df.iloc[:max_people]
+  return df
 
 class ZoomSesh:
   '''Object that helps organize large groups of people during a zoom call.'''
 
-  def __init__(self, filename=None, max_people=40):
+  def __init__(self, filename, max_people=40):
     '''Constructor
     Args:
       filename: location of a file containing the alumni for this session. Columns
@@ -49,12 +57,11 @@ class ZoomSesh:
         unless `filename` is None.
   
     '''
-    if filename is not None:
-      raise NotImplementedError('This feature is not ready yet')
+    if filename == 'development':
+      self._alumni_history = [make_fake_data(max_people=max_people)]
     
     else:
-      # For development, testing, debugging, etc.
-      self._alumni_history = [make_fake_data(max_people=max_people)]
+      self._alumni_history = [import_alumni_data(filename)]
 
   @property
   def alumni(self):
