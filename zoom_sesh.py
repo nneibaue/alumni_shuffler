@@ -9,6 +9,7 @@ import aslogging as logging
 import shutil
 
 COLAB_ROOT = '/content'
+ALUMNI_FILE = 'alumni.xlsx'
 
 if os.getcwd() == COLAB_ROOT:  # In Colab
   NAMES_DIR = os.path.join(COLAB_ROOT, 'alumni_shuffler', 'names')
@@ -59,16 +60,18 @@ class ZoomSesh:
     if 'alumni.xlsx' not in os.listdir(session_directory):
       raise FileNotFoundError(f"No alumni file found! Please make sure to include 'alumni.xlsx' in {session_directory}")
       
-    self._alumni_file = os.path.join(session_directory, 'alumni.xlsx')
+    alumni_file = os.path.join(session_directory, ALUMNI_FILE)
     self._session_directory = session_directory
-    self._alumni_data = self._create_tracking_cols(pd.read_excel(self._alumni_file)) # DataFrame with raw data from alumni file
-    self._alumni_history = []
-    self._breakout_history = []
+    self._alumni_data = pd.read_excel(alumni_file) # DataFrame with raw data from alumni file
 
     # Attributes for this zoom session. These are taken from the column names of the alumni file
     # For now, these will likely just be 'name', 'year' and 'track'
-    self.attributes = list(self._alumni_data.columns)
+    self.attributes = [col for col in self._alumni_data.columns]
 
+    self._alumni_data = self._create_tracking_cols((self._alumni_data))
+
+    self._alumni_history = []
+    self._breakout_history = []
 
   @staticmethod
   def _create_tracking_cols(df):
