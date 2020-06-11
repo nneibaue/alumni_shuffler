@@ -20,12 +20,6 @@ def import_random_names(dir):
   print('len after import random names: ', len(df))
   return df
 
-def _create_tracking_cols(df):
-  for i in df.index:
-    df[f'{i}'] = np.zeros(len(df))
-    df[f'{i}_cnsctv'] = np.zeros(len(df))
-  return df
-  
 def import_alumni_data(fname):
   df = pd.read_excel(fname)
   return _create_tracking_cols(df)
@@ -47,28 +41,43 @@ def make_fake_data(max_people=40):
 class ZoomSesh:
   '''Object that helps organize large groups of people during a zoom call.'''
 
-  def __init__(self, filename, max_people=40):
-    '''Constructor
+  def __init__(self, session_directory):
+    '''Creates a ZoomSesh from student file contained in session_directory
     Args:
-      filename: location of a file containing the alumni for this session. Columns
-        TBD. If `None`, then ZoomSesh will initialize with fake data of len `max_people`.
-  
-      max_people: int specifying number of people for fake data. Does not do anything
-        unless `filename` is None.
-  
+      session_directory: folder containing important information about a session. This folder
+        *must* contain a file called 'alumni.xlsx' containing the columns 'name', 'year',
+        and 'track'.
     '''
-    if filename == 'development':
-      self._alumni_history = [make_fake_data(max_people=max_people)]
-    
-    else:
-      self._alumni_history = [import_alumni_data(filename)]
+
+    if 'alumni.xlsx' not in os.listdir(session_directory):
+      raise FileNotFoundError(f"No alumni file found! Please make sure to include 'alumni.xlsx' in {session_directory}")
+      
+    self._alumni_file = os.path.join(session_directory, 'alumni.xlsx')
+    self._session_directory = session_directory
+    self._alumni_data = pd.read_excel(self._alumni_file) # DataFrame with raw data from alumni file
+    self._alumni_history = [ZoomSesh._create_tracking_cols(self._alumni_data)]
+    self._breakout_history = []
+
+    # Attributes for this zoom session. These are taken from the column names of the alumni file
+    # For now, these will likely just be 'name', 'year' and 'track'
+    self.attributes = list(self._alumni_data.columns)
+
+
+  @staticmethod
+  def _create_tracking_cols(df):
+    df = df.copy()
+    for i in df.index:
+      df[f'{i}'] = np.zeros(len(df))
+      df[f'{i}_cnsctv'] = np.zeros(len(df))
+    return df
 
   @property
   def alumni(self):
     '''Returns 'current' alumni matrix, which is the top matrix in the stack.'''
     return self._alumni_history[0]
 
-
+  # Core algorithm
+  # ====================================================
   def breakout(self, by, group_size, diff=False, n=None):
     '''Generates a single breakout group based on the current state.
     
@@ -131,6 +140,7 @@ class ZoomSesh:
     breakout_dict = dict(zip(keys,all_groups))
     breakout_dict['extras'] = all_extras
 
+    self._breakout_history.append(breakout_dict)
     return breakout_dict
 
 
@@ -239,8 +249,6 @@ class ZoomSesh:
         alumni.loc[~alumni.index.isin(extras), mask] = 0
         break
 
-    
-
       else:
         combo = self._min_combo(current_df, by=by, arg=arg, group_size=group_size)
 
@@ -265,6 +273,23 @@ class ZoomSesh:
       logging.log(f'Time through while: {while_stop - while_start}')
 
     return extras, prev_combos
+
+  # Output and display funcs
+  # ====================================================
+  def save_breakout(self, i):
+    if i > len(self._breakout_history):
+      raise ValueError(f"Breakout {i} doesn't exist!")
+
+    b = self._breakout_history[i - 1]
+    
+    writer = pd.ExcelWriter(os.path.join(self._session_directory, f'breakout{i}.xlsx'), engine='openpyxl')
+    for group in b:
+      df = self.alumni[self.attributes].iloc[b[group]]
+      df.to_excel(writer, sheet_name=group)
+    
+    self.alumni.to_excel(w, sheet_name='alumni_matrix') 
+    writer.save()
+    writer.close()
 
   def summary_html(self):
     years = dict(self.alumni.year.value_counts())

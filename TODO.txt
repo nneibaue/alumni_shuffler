@@ -1,0 +1,1 @@
+- Add yaml config file that shows valid options for different attributes (e.g. 'track' can only be 'semi', 'optics' etc.)
