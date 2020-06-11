@@ -62,7 +62,7 @@ class ZoomSesh:
       
     alumni_file = os.path.join(session_directory, ALUMNI_FILE)
     self._session_directory = session_directory
-    self._alumni_data = pd.read_excel(alumni_file) # DataFrame with raw data from alumni file
+    self._alumni_data = pd.read_excel(alumni_file, index_col=[0]) # DataFrame with raw data from alumni file
 
     # Attributes for this zoom session. These are taken from the column names of the alumni file
     # For now, these will likely just be 'name', 'year' and 'track'
