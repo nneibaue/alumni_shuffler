@@ -78,6 +78,7 @@ class ZoomSesh:
       df[f'{i}_cnsctv'] = np.zeros(len(df))
     return df
 
+  @property
   def alumni(self):
     return self._alumni.copy()
 
