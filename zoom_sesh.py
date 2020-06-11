@@ -20,10 +20,6 @@ def import_random_names(dir):
   print('len after import random names: ', len(df))
   return df
 
-def import_alumni_data(fname):
-  df = pd.read_excel(fname)
-  return _create_tracking_cols(df)
-
 def make_fake_data(max_people=40):
   df = import_random_names(NAMES_DIR)
   track_names = ['optics', 'semi', 'polymer', 'sensors']
@@ -34,7 +30,7 @@ def make_fake_data(max_people=40):
 
   person_id = list(map(str,np.arange(max_people).tolist()))
 
-  df = _create_tracking_cols(df.iloc[:max_people])
+  df = ZoomSesh._create_tracking_cols(df.iloc[:max_people])
 
   return df
 
@@ -287,7 +283,6 @@ class ZoomSesh:
       df = self.alumni[self.attributes].iloc[b[group]]
       df.to_excel(writer, sheet_name=group)
     
-    self.alumni.to_excel(w, sheet_name='alumni_matrix') 
     writer.save()
     writer.close()
 
