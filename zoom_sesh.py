@@ -35,6 +35,7 @@ def make_fake_data(dir_name, max_people=40, overwrite=True):
   if os.path.isdir(dir_name):
     if overwrite:
       shutil.rmtree(dir_name)
+      os.mkdir(dir_name)
     else:
       raise ValueError(f'{dir_name} already exists! Please set `overwrite` to `False`')
   else:
