@@ -158,20 +158,15 @@ class ZoomSesh:
 
   # TODO: Fill out this docstring
   def _min_combo(self, alumni, by=None, arg=None, group_size=6):
-    num_unique_total = None
-    this_category = None
-    if arg == 'diff':
-      if by == 'all':
-        raise ValueError(f"Incompatible params: by='all', arg='diff'")
-      num_unique_total = len(alumni[by].unique())
+    filter_combos_for_diversity = False
+    if by == 'all': # 'diff' is irrelevant, so we don't have to filter combos
       indices = alumni.index
-      this_category = alumni[by].values.astype(str)
-    elif arg != 'diff':
-      if by != 'all':
-        indices = alumni[alumni[by] == arg].index
-        this_category = alumni[by].values.astype(str)
-      else:
+    else:
+      if arg == 'diff':
+        filter_combos_for_diversity = True
         indices = alumni.index
+      else:
+        indices = alumni[alumni[by] == arg].index
 
     counts_cols = [col for col in alumni.columns[3:] if '_' not in col]
     cnsctv_cols = [col for col in alumni.columns[3:] if '_' in col]
@@ -183,19 +178,16 @@ class ZoomSesh:
     # the number of students. 
     alumni_arr = np.concatenate([counts_arr, cnsctv_arr], axis=1) 
 
-    @jit(nopython=True)
-    def is_combo_diverse(combo):
-      if num_unique_total is None:
-        return True
-      num_unique = len(np.unique(this_category[combo]))
-      if num_unique >= num_unique_total:
-        return True
-      else:
+    @jit(nopython=True, cache=True)
+    def is_combo_diverse(combo, col, threshold):
+      num_unique_combo = len(np.unique(col[combo]))
+
+      if num_unique_combo < threshold:
         return False
+      return True
 
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def get_sum(arr, combo):
-
       counts_sum = arr[combo][: , combo]
       cnsctv_sum = arr[combo][:, combo + len(arr)]
       return np.sum(counts_sum) + np.sum(cnsctv_sum)
@@ -206,10 +198,12 @@ class ZoomSesh:
 
     if combo_arr.size == 0:
       return 1
-    # Apply `is_combo_diverse` to each combo, only returning 'diverse' combos
-    good_combos = np.apply_along_axis(is_combo_diverse, axis=1, arr=combo_arr)
-    combo_arr = combo_arr[np.where(good_combos)]
 
+    if filter_combos_for_diversity:
+      col = alumni[by].values.astype(str)
+      threshold = min(group_size, len(np.unique(col)))
+      good_combos = np.apply_along_axis(lambda combo: is_combo_diverse(combo, col, threshold), axis=1, arr=combo_arr)
+      combo_arr = combo_arr[np.where(good_combos)]
 
     # Apply `get_sum` to each combo 
     sums = np.apply_along_axis(lambda combo: get_sum(alumni_arr, combo), axis=1, arr=combo_arr)
