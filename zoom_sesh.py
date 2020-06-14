@@ -159,15 +159,17 @@ class ZoomSesh:
   # TODO: Fill out this docstring
   def _min_combo(self, alumni, by=None, arg=None, group_size=6):
     num_unique_total = None
+    this_category = None
     if arg == 'diff':
       if by == 'all':
         raise ValueError(f"Incompatible params: by='all', arg='diff'")
       num_unique_total = len(alumni[by].unique())
       indices = alumni.index
+      this_category = alumni[by].values.astype(str)
     elif arg != 'diff' and by != 'all':
       indices = alumni[alumni[by] == arg].index
+      this_category = alumni[by].values.astype(str)
 
-    this_category = alumni[by].values.astype(str)
     counts_cols = [col for col in alumni.columns[3:] if '_' not in col]
     cnsctv_cols = [col for col in alumni.columns[3:] if '_' in col]
   
@@ -199,6 +201,8 @@ class ZoomSesh:
     combos = combinations(indices, group_size)
     combo_arr = np.array(list(combos), dtype='int8')
 
+    if combo_arr.size == 0:
+      return 1
     # Apply `is_combo_diverse` to each combo, only returning 'diverse' combos
     good_combos = np.apply_along_axis(is_combo_diverse, axis=1, arr=combo_arr)
     combo_arr = combo_arr[np.where(good_combos)]
