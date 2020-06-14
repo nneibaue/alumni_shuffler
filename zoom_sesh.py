@@ -166,9 +166,12 @@ class ZoomSesh:
       num_unique_total = len(alumni[by].unique())
       indices = alumni.index
       this_category = alumni[by].values.astype(str)
-    elif arg != 'diff' and by != 'all':
-      indices = alumni[alumni[by] == arg].index
-      this_category = alumni[by].values.astype(str)
+    elif arg != 'diff':
+      if by != 'all':
+        indices = alumni[alumni[by] == arg].index
+        this_category = alumni[by].values.astype(str)
+      else:
+        indices = alumni.index
 
     counts_cols = [col for col in alumni.columns[3:] if '_' not in col]
     cnsctv_cols = [col for col in alumni.columns[3:] if '_' in col]
