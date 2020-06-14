@@ -157,7 +157,7 @@ class ZoomSesh:
 
 
   # TODO: Fill out this docstring
-  def min_combo_numpy(self, alumni, by=None, arg=None, group_size=6):
+  def _min_combo(self, alumni, by=None, arg=None, group_size=6):
     num_unique_total = None
     if arg == 'diff':
       if by == 'all':
