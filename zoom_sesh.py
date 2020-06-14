@@ -209,7 +209,7 @@ class ZoomSesh:
 
     min_list = np.where(sums == np.amin(sums))[0]
 
-    return combo_arr[random.choice(min_list)]
+    return list(combo_arr[random.choice(min_list)])
 
     
 
