@@ -32,7 +32,6 @@ def make_fake_data(dir_name, max_people=40, overwrite=True):
   df['track'] = [random.choice(track_names) for _ in range(len(names))]
   df['year'] = [random.choice(years) for _ in range(len(names))]
 
-  #df = ZoomSesh._create_tracking_cols(df.iloc[:max_people])
   if os.path.isdir(dir_name):
     if overwrite:
       shutil.rmtree(dir_name)
