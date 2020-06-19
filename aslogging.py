@@ -3,6 +3,16 @@
 import os
 from datetime import datetime
 
+
+# TODO Fill this out so that logs can be copied to session directories
+def copy_log(dirs):
+  '''Copies the most recent log file to specified directories.
+  
+  Args:
+    dirs: list of directories
+  '''
+  pass
+
 def get_logfile():
   if not os.path.isdir('logs'):
     os.makedirs('logs')

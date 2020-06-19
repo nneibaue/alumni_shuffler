@@ -6,73 +6,96 @@ from itertools import combinations
 from timeit import default_timer as timer
 from html_maker import HtmlMaker
 import aslogging as logging
+import shutil
 
 COLAB_ROOT = '/content'
+ALUMNI_FILE = 'alumni.xlsx'
 
 if os.getcwd() == COLAB_ROOT:  # In Colab
   NAMES_DIR = os.path.join(COLAB_ROOT, 'alumni_shuffler', 'names')
 else:  # On local machine
   NAMES_DIR = './names'
   
-def import_names(dir):
-  name_files = [f for f in os.listdir(NAMES_DIR) if f.startswith('yob')]
+def import_random_names(dir):
+  name_files = [f for f in os.listdir(dir) if f.startswith('yob')]
   df = pd.read_csv(os.path.join(dir, name_files[0]))
   return df
 
-def make_fake_data(max_people=40):
-  df = import_names(NAMES_DIR)
+def make_fake_data(dir_name, max_people=40, overwrite=True):
+  df = import_random_names(NAMES_DIR)
   track_names = ['optics', 'semi', 'polymer', 'sensors']
   years = list(map(str, range(2013, 2020)))
   df.columns = ['name', 'year', 'track']
   df['track'] = [random.choice(track_names) for _ in range(len(df))]
   df['year'] = [random.choice(years) for _ in range(len(df))]
 
-  df = df.iloc[:max_people]  
   person_id = list(map(str,np.arange(max_people).tolist()))
 
-  for i in person_id:
-    df[i] = np.zeros(len(df))
-    df[i+"_cnsctv"] = np.zeros(len(df))
+  if os.path.isdir(dir_name):
+    if overwrite:
+      shutil.rmtree(dir_name)
+      os.mkdir(dir_name)
+    else:
+      raise ValueError(f'{dir_name} already exists! Please set `overwrite` to `False`')
+  else:
+    os.mkdir(dir_name)
 
-  return df.iloc[:max_people]
+  w = pd.ExcelWriter(f'{dir_name}/alumni.xlsx')
+  df.iloc[:max_people].to_excel(w, index=False)
+  w.save()
+  w.close()
+
 
 class ZoomSesh:
   '''Object that helps organize large groups of people during a zoom call.'''
 
-  def __init__(self, filename=None, max_people=40):
-    '''Constructor
+  def __init__(self, session_directory):
+    '''Creates a ZoomSesh from student file contained in session_directory
     Args:
-      filename: location of a file containing the alumni for this session. Columns
-        TBD. If `None`, then ZoomSesh will initialize with fake data of len `max_people`.
-  
-      max_people: int specifying number of people for fake data. Does not do anything
-        unless `filename` is None.
-  
+      session_directory: folder containing important information about a session. This folder
+        *must* contain a file called 'alumni.xlsx' containing the columns 'name', 'year',
+        and 'track'.
     '''
-    if filename is not None:
-      raise NotImplementedError('This feature is not ready yet')
-    
-    else:
-      # For development, testing, debugging, etc.
-      self._alumni_history = [make_fake_data(max_people=max_people)]
+
+    if 'alumni.xlsx' not in os.listdir(session_directory):
+      raise FileNotFoundError(f"No alumni file found! Please make sure to include 'alumni.xlsx' in {session_directory}")
+      
+    alumni_file = os.path.join(session_directory, ALUMNI_FILE)
+    self._session_directory = session_directory
+    self._alumni_data = pd.read_excel(alumni_file) # DataFrame with raw data from alumni file
+
+    # Attributes for this zoom session. These are taken from the column names of the alumni file
+    # For now, these will likely just be 'name', 'year' and 'track'
+    self.attributes = [col for col in self._alumni_data.columns]
+
+    self._alumni_data = self._create_tracking_cols((self._alumni_data))
+
+    self._alumni_history = []
+    self._breakout_history = []
+
+  @staticmethod
+  def _create_tracking_cols(df):
+    df = df.copy()
+    for i in df.index:
+      df[f'{i}'] = np.zeros(len(df))
+      df[f'{i}_cnsctv'] = np.zeros(len(df))
+    return df
 
   @property
   def alumni(self):
-    '''Returns 'current' alumni matrix, which is the top matrix in the stack.'''
-    return self._alumni_history[0]
+    return self._alumni_data.copy()
 
-
-  def breakout(self, by, group_size, diff=False, n=None):
+  # Core algorithm
+  # ====================================================
+  def breakout(self, by, group_size, diff=False, autosave=True):
     '''Generates a single breakout group based on the current state.
     
     Args:
       by: string identifier to use for combining alumni
       same: bool saying whether to combine alumni based on similaritis
         (same=True) or differences (same=False).
-      group_size: tuple specifying range of acceptable group sizes
-      n: number of subsequent breakouts. if n=None, then will return the min
-        number of breakouts required for everyone to see everyone else according
-        to `by` and `same`. 
+      group_size: integer. Desired group size
+      autosave: bool. Whether or not to save the breakouts to excel automatically
 
     Examples:
 
@@ -95,7 +118,7 @@ class ZoomSesh:
         the breakout number.
 
     '''
-    alumni = self.alumni
+    alumni = self._alumni_data
     if diff and by != 'all':
       all_extras, all_groups = self._group_split(by, 'diff', group_size)
 
@@ -124,6 +147,10 @@ class ZoomSesh:
     breakout_dict = dict(zip(keys,all_groups))
     breakout_dict['extras'] = all_extras
 
+    self._breakout_history.append(breakout_dict)
+    self._alumni_history.append(self._alumni_data.copy())
+    if autosave:
+      self.save_breakout(len(self._breakout_history))
     return breakout_dict
 
 
@@ -204,7 +231,7 @@ class ZoomSesh:
 
     prev_combos = []
     extras = []
-    alumni = self.alumni
+    alumni = self._alumni_data
     end_of_split = False
 
     while(True):
@@ -232,8 +259,6 @@ class ZoomSesh:
         alumni.loc[~alumni.index.isin(extras), mask] = 0
         break
 
-    
-
       else:
         combo = self._min_combo(current_df, by=by, arg=arg, group_size=group_size)
 
@@ -259,12 +284,28 @@ class ZoomSesh:
 
     return extras, prev_combos
 
+  # Output and display funcs
+  # ====================================================
+  def save_breakout(self, i):
+    if i > len(self._breakout_history):
+      raise ValueError(f"Breakout {i} doesn't exist!")
+
+    b = self._breakout_history[i - 1]
+    
+    writer = pd.ExcelWriter(os.path.join(self._session_directory, f'breakout{i}.xlsx'), engine='openpyxl')
+    for group in b:
+      df = self._alumni_data[self.attributes].iloc[b[group]]
+      df.to_excel(writer, sheet_name=group)
+    
+    writer.save()
+    writer.close()
+
   def summary_html(self):
-    years = dict(self.alumni.year.value_counts())
-    tracks = dict(self.alumni.track.value_counts())
+    years = dict(self._alumni_data.year.value_counts())
+    tracks = dict(self._alumni_data.track.value_counts())
 
     def split_alumni():
-      alumni = self.alumni[['name', 'year', 'track']]
+      alumni = self._alumni_data[['name', 'year', 'track']]
       l = len(alumni)
       if l % 10 == 0:
         N = l // 10
@@ -274,7 +315,7 @@ class ZoomSesh:
       return groups
 
     def get_counts_df(attr):
-      counts_df =  pd.DataFrame(self.alumni[attr].value_counts()).reset_index()
+      counts_df =  pd.DataFrame(self._alumni_data[attr].value_counts()).reset_index()
       counts_df.columns = [attr, 'count']
       return counts_df
 
@@ -282,7 +323,7 @@ class ZoomSesh:
     track_counts = get_counts_df('track')
 
     left = HtmlMaker()
-    left.add_html_element(f'<h2>Total Attendees: {len(self.alumni)}</h2>')
+    left.add_html_element(f'<h2>Total Attendees: {len(self._alumni_data)}</h2>')
     left.apply_style({
         'td.summary': {
             'padding': '5px',
