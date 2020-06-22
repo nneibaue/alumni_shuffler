@@ -7,6 +7,7 @@ from timeit import default_timer as timer
 from html_maker import HtmlMaker
 import aslogging as logging
 import shutil
+import json
 
 COLAB_ROOT = '/content'
 ALUMNI_FILE = 'alumni.xlsx'
@@ -16,20 +17,20 @@ if os.getcwd() == COLAB_ROOT:  # In Colab
 else:  # On local machine
   NAMES_DIR = './names'
   
-def import_random_names(dir):
+def import_random_names(dir, max_people):
   name_files = [f for f in os.listdir(dir) if f.startswith('yob')]
   df = pd.read_csv(os.path.join(dir, name_files[0]))
-  return df
+  names_col = df.columns[0]
+  return df[names_col][:max_people]
 
 def make_fake_data(dir_name, max_people=40, overwrite=True):
-  df = import_random_names(NAMES_DIR)
+  names = import_random_names(NAMES_DIR, max_people=max_people)
   track_names = ['optics', 'semi', 'polymer', 'sensors']
   years = list(map(str, range(2013, 2020)))
-  df.columns = ['name', 'year', 'track']
-  df['track'] = [random.choice(track_names) for _ in range(len(df))]
-  df['year'] = [random.choice(years) for _ in range(len(df))]
-
-  person_id = list(map(str,np.arange(max_people).tolist()))
+  df=pd.DataFrame()
+  df['name'] = names
+  df['track'] = [random.choice(track_names) for _ in range(len(names))]
+  df['year'] = [random.choice(years) for _ in range(len(names))]
 
   if os.path.isdir(dir_name):
     if overwrite:
@@ -287,12 +288,24 @@ class ZoomSesh:
   # Output and display funcs
   # ====================================================
   def save_breakout(self, i):
+    '''Saves breakout groups to Excel and breakout dict as json
+
+    Args: 
+      i: breakout number
+    '''
+
     if i > len(self._breakout_history):
       raise ValueError(f"Breakout {i} doesn't exist!")
 
     b = self._breakout_history[i - 1]
+    fname = os.path.join(self._session_directory, 'breakout{i}.{ext}')
+
+    # Save breakout dict as json. No names will be included
+    with open(fname.format(i=i, ext='json'), 'w') as f:
+      json.dump(b, f)
     
-    writer = pd.ExcelWriter(os.path.join(self._session_directory, f'breakout{i}.xlsx'), engine='openpyxl')
+    # Save breakout to excel
+    writer = pd.ExcelWriter(fname.format(i=i, ext='xlsx'), engine='openpyxl')
     for group in b:
       df = self._alumni_data[self.attributes].iloc[b[group]]
       df.to_excel(writer, sheet_name=group)
