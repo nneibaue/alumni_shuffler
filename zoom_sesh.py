@@ -62,6 +62,12 @@ class ZoomSesh:
       raise FileNotFoundError(f"No alumni file found! Please make sure to include 'alumni.xlsx' in {session_directory}")
       
     alumni_file = os.path.join(session_directory, ALUMNI_FILE)
+    self._breakout_file = os.path.join(session_directory, 'breakouts.json')  # To save non-sensitive breakout data
+    if not os.path.exists(self._breakout_file):
+      # Save blank breakout file
+      with open(self._breakout_file, 'w') as f:
+        json.dump({}, f)
+        
     self._session_directory = session_directory
     self._alumni_data = pd.read_excel(alumni_file) # DataFrame with raw data from alumni file
 
@@ -151,7 +157,7 @@ class ZoomSesh:
     self._breakout_history.append(breakout_dict)
     self._alumni_history.append(self._alumni_data.copy())
     if autosave:
-      self.save_breakout(len(self._breakout_history))
+      self._save_breakout(len(self._breakout_history))
     return breakout_dict
 
 
@@ -287,7 +293,7 @@ class ZoomSesh:
 
   # Output and display funcs
   # ====================================================
-  def save_breakout(self, i):
+  def _save_breakout(self, i):
     '''Saves breakout groups to Excel and breakout dict as json
 
     Args: 
@@ -298,14 +304,20 @@ class ZoomSesh:
       raise ValueError(f"Breakout {i} doesn't exist!")
 
     b = self._breakout_history[i - 1]
-    fname = os.path.join(self._session_directory, 'breakout{i}.{ext}')
 
-    # Save breakout dict as json. No names will be included
-    with open(fname.format(i=i, ext='json'), 'w') as f:
-      json.dump(b, f)
+    # Read current breakouts into memory
+    with open(self._breakout_file, 'r') as current:
+      breakouts = json.load(current)
+      
+    # Add new breakout and write back to disk. Note that this operation overwrites
+    # the current breakout of the same name
+    breakouts[f'breakout{i}'] = b
+    with open(self._breakout_file, 'w') as f:
+      json.dump(breakouts, f, indent=2)
     
     # Save breakout to excel
-    writer = pd.ExcelWriter(fname.format(i=i, ext='xlsx'), engine='openpyxl')
+    excel_fname = os.path.join(self._session_directory, 'breakout{i}.xlsx')
+    writer = pd.ExcelWriter(excel_fname.format(i=i, ext='xlsx'), engine='openpyxl')
     for group in b:
       df = self._alumni_data[self.attributes].iloc[b[group]]
       df.to_excel(writer, sheet_name=group)
