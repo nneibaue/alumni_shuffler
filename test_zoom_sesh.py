@@ -6,6 +6,9 @@ import shutil
 import time
 
 
+# This function is used in the TestDirectory context manager below
+# and needs to be tested first to make sure the context manager 
+# does not break
 class TestDirectory():
   '''Context manager to create a temporary directory with fake data.
   
@@ -33,9 +36,6 @@ class TestDirectory():
   def __exit__(self, exc_type, exc_value, exc_traceback):
     # Remove test directory
     shutil.rmtree(self._d)
-# This function is used in the TestDirectory context manager below
-# and needs to be tested first to make sure the context manager 
-# does not break
 
 
 #========================================================
@@ -69,6 +69,7 @@ def test_make_fake_data_overwrite_false():
   
   # Remove directory
   shutil.rmtree(d)
+
 
 def test_make_specific_fake_data():
   d = 'specific_fake_data'
