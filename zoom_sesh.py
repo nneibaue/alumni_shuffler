@@ -23,14 +23,14 @@ def clear_session_dir(d):
     if fname != 'alumni.xlsx':
       os.remove(os.path.join(d, fname))
 
-def import_random_names(d, max_people):
+def import_random_names(d):
   name_files = [f for f in os.listdir(d) if f.startswith('yob')]
   df = pd.read_csv(os.path.join(d, name_files[0]))
   names_col = df.columns[0]
-  return df[names_col][:max_people]
+  return df[names_col]
 
 def make_fake_data(d, max_people=40, overwrite=True):
-  names = import_random_names(NAMES_DIR, max_people=max_people)
+  names = import_random_names(NAMES_DIR)[:max_people]
   track_names = ['optics', 'semi', 'polymer', 'sensors']
   years = list(map(str, range(2013, 2020)))
   df=pd.DataFrame()
@@ -51,6 +51,59 @@ def make_fake_data(d, max_people=40, overwrite=True):
   df.iloc[:max_people].to_excel(w, index=False)
   w.save()
   w.close()
+
+def make_specific_fake_data(d, overwrite=True, **attributes):
+  '''Creates a session directory with a very specific alumni.xlsx file.
+
+  Args:
+    d: name of session_directory to create
+    overwrite: bool. Whether to overwrite a session directory that already exists
+    attributes: attributes in the resulting alumni.xlsx file, along with the
+      number of students to put in different categories for that attribute. For
+      example: `track={'optics': 3, 'semi': 4}, year={'2012': 5, '2013', 2}`.
+      If the total number of students from each attribute does not add up to the same
+      value, this function will result in an error (like if there are 8 total in
+      `track` and 9 total in `year`)
+  '''
+
+  if os.path.isdir(d):
+    if overwrite:
+      shutil.rmtree(d)
+      os.mkdir(d)
+    else:
+      raise ValueError(f'{d} already exists! Please set `overwrite` to `False`')
+  else:
+    os.mkdir(d)
+
+  if not attributes:
+    raise ValueError('At least one attribute must be specified')
+
+  names = import_random_names(NAMES_DIR)
+  df = pd.DataFrame()
+  num_people = None
+  for attr in attributes:
+    col = []
+    flavors = attributes[attr]
+    assert isinstance(flavors, dict)
+    for flavor in flavors:
+      n = flavors[flavor]
+      col += [flavor] * n
+    if not num_people:
+      num_people = len(col)
+      df['name'] = names.iloc[:num_people]
+    else:
+      if len(col) != num_people:
+        raise ValueError('Number of people must be the same for all attributes!') 
+    df[attr] = col
+
+  w = pd.ExcelWriter(f'{d}/alumni.xlsx')
+  df.to_excel(w, index=False)
+  w.save()
+  w.close()
+
+
+  
+
 
 
 class ZoomSesh:
