@@ -28,6 +28,23 @@ def test_make_fake_data_default():
   shutil.rmtree(d)
 
 
+def test_make_fake_data_overwrite_false():
+  d = 'test_sessions/fake_data'
+
+  try:
+    shutil.rmtree(d)
+  except FileNotFoundError:
+    pass
+
+  # Make fake data once
+  zoom_sesh.make_fake_data(d)
+
+  with pytest.raises(ValueError) as e:
+    # Try making fake data again in the same directory
+    zoom_sesh.make_fake_data(d, overwrite=False)  # Should raise exception
+    assert f'{d} already exists' in str(e.value)
+
+
 class TestDirectory():
   '''Context manager to create a temporary directory with fake data.
   
@@ -65,7 +82,7 @@ def test_ZoomSesh_instantiation():
       assert isinstance(z, zoom_sesh.ZoomSesh)
 
 
-def test_breakout_files_exit():
+def test_breakout_files_exist():
   d = 'test_sessions/breakout_files_exist'
   with TestDirectory(d, max_people=6):
     z = zoom_sesh.ZoomSesh(d)
