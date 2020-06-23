@@ -94,6 +94,21 @@ def test_make_specific_fake_data():
   shutil.rmtree(d)
 
 
+def test_make_specific_fake_data_wrong_number_of_people_raises_exception():
+  d = 'specific_fake_data'
+
+  # 8 people specified for track
+  tracks = {'optics': 2, 'semi': 2, 'polymer': 3, 'sensors': 1}
+
+  # Only 7 people specified for year
+  years = {'2012': 3, '2013': 4}
+  with pytest.raises(ValueError) as e:
+      zoom_sesh.make_specific_fake_data(d,track=tracks, year=years)
+      assert 'Number of people must be the same' in str(e.value) 
+
+  shutil.rmtree(d)
+  
+  
 #========================================================
 # INFRASTRUCTURE TESTING
 #========================================================
@@ -211,6 +226,3 @@ def test_state_array_book_keeping():
         test4 = False
 
   assert test1 == test2 == test3 == test4 == True
-
-      
-
