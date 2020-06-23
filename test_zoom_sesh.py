@@ -148,3 +148,26 @@ def test_single_breakout_equal_tracks_no_extras():
     z = zoom_sesh.ZoomSesh(d)
     b = z.breakout('track', 5)
     assert len(b['extras']) == 0
+
+    
+# Replay function is not written yet!
+def test_replay_breakouts_from_json():
+  d = 'test_sessions/replay_20_random'
+  func = zoom_sesh.make_fake_data
+  with TestDirectory(d, func, max_people=20):
+      z = zoom_sesh.ZoomSesh(d)
+
+      # Do 5 breakouts
+      for _ in range(5):
+        z.breakout('track', 3)
+
+      # Make a copy of old history to check against after replay
+      old_history = z._alumni_history.copy()
+
+      # Rewrite history from breakouts file
+      breakouts_file = os.path.join(d, 'breakouts.json')
+      z.replay_from_json(breakouts_file)
+
+      # Test that new history is the same as old history
+      for i, alumni_matrix in enumerate(z._alumni_history):
+        assert alumni_matrix == old_history[i]
