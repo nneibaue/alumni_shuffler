@@ -11,14 +11,6 @@ import time
 def test_make_fake_data_default():
   d = 'test_sessions/fake_data'
 
-  # Make sure that this directory does not already exist, as
-  # we are testing its creation. Usually, logic shouldn't be in 
-  # tests, but this is a small exception
-  try:
-    shutil.rmtree(d)
-  except FileNotFoundError:
-    pass
-
   zoom_sesh.make_fake_data(d)
 
   assert os.path.isdir(d)
@@ -31,18 +23,16 @@ def test_make_fake_data_default():
 def test_make_fake_data_overwrite_false():
   d = 'test_sessions/fake_data'
 
-  try:
-    shutil.rmtree(d)
-  except FileNotFoundError:
-    pass
-
-  # Make fake data once
+  # Make fake data once with overwrite=True (default)
   zoom_sesh.make_fake_data(d)
 
   with pytest.raises(ValueError) as e:
     # Try making fake data again in the same directory
     zoom_sesh.make_fake_data(d, overwrite=False)  # Should raise exception
     assert f'{d} already exists' in str(e.value)
+  
+  # Remove directory
+  shutil.rmtree(d)
 
 
 class TestDirectory():
