@@ -1,3 +1,4 @@
+from numba import jit
 import pandas as pd
 import numpy as np
 import random
@@ -7,6 +8,8 @@ from timeit import default_timer as timer
 from html_maker import HtmlMaker
 import aslogging as logging
 import shutil
+import json
+import openpyxl
 
 COLAB_ROOT = '/content'
 ALUMNI_FILE = 'alumni.xlsx'
@@ -16,34 +19,93 @@ if os.getcwd() == COLAB_ROOT:  # In Colab
 else:  # On local machine
   NAMES_DIR = './names'
   
-def import_random_names(dir):
-  name_files = [f for f in os.listdir(dir) if f.startswith('yob')]
-  df = pd.read_csv(os.path.join(dir, name_files[0]))
-  return df
+def clear_session_dir(d):
+  '''Removes all files from a session directory except alumni.xlsx'''
+  for fname in os.listdir(d):
+    if fname != 'alumni.xlsx':
+      os.remove(os.path.join(d, fname))
 
-def make_fake_data(dir_name, max_people=40, overwrite=True):
-  df = import_random_names(NAMES_DIR)
+def import_random_names(d):
+  name_files = [f for f in os.listdir(d) if f.startswith('yob')]
+  df = pd.read_csv(os.path.join(d, name_files[0]))
+  names_col = df.columns[0]
+  return df[names_col]
+
+def make_fake_data(d, max_people=40, overwrite=True):
+  names = import_random_names(NAMES_DIR)[:max_people]
   track_names = ['optics', 'semi', 'polymer', 'sensors']
   years = list(map(str, range(2013, 2020)))
-  df.columns = ['name', 'year', 'track']
-  df['track'] = [random.choice(track_names) for _ in range(len(df))]
-  df['year'] = [random.choice(years) for _ in range(len(df))]
+  df=pd.DataFrame()
+  df['name'] = names
+  df['track'] = [random.choice(track_names) for _ in range(len(names))]
+  df['year'] = [random.choice(years) for _ in range(len(names))]
 
-  person_id = list(map(str,np.arange(max_people).tolist()))
-
-  if os.path.isdir(dir_name):
+  if os.path.isdir(d):
     if overwrite:
-      shutil.rmtree(dir_name)
-      os.mkdir(dir_name)
+      shutil.rmtree(d)
+      os.mkdir(d)
     else:
-      raise ValueError(f'{dir_name} already exists! Please set `overwrite` to `False`')
+      raise ValueError(f'{d} already exists! Please set `overwrite` to `False`')
   else:
-    os.mkdir(dir_name)
+    os.mkdir(d)
 
-  w = pd.ExcelWriter(f'{dir_name}/alumni.xlsx')
+  w = pd.ExcelWriter(f'{d}/alumni.xlsx')
   df.iloc[:max_people].to_excel(w, index=False)
   w.save()
   w.close()
+
+def make_specific_fake_data(d, overwrite=True, **attributes):
+  '''Creates a session directory with a very specific alumni.xlsx file.
+
+  Args:
+    d: name of session_directory to create
+    overwrite: bool. Whether to overwrite a session directory that already exists
+    attributes: attributes in the resulting alumni.xlsx file, along with the
+      number of students to put in different categories for that attribute. For
+      example: `track={'optics': 3, 'semi': 4}, year={'2012': 5, '2013', 2}`.
+      If the total number of students from each attribute does not add up to the same
+      value, this function will result in an error (like if there are 8 total in
+      `track` and 9 total in `year`)
+  '''
+
+  if os.path.isdir(d):
+    if overwrite:
+      shutil.rmtree(d)
+      os.mkdir(d)
+    else:
+      raise ValueError(f'{d} already exists! Please set `overwrite` to `False`')
+  else:
+    os.mkdir(d)
+
+  if not attributes:
+    raise ValueError('At least one attribute must be specified')
+
+  names = import_random_names(NAMES_DIR)
+  df = pd.DataFrame()
+  num_people = None
+  for attr in attributes:
+    col = []
+    flavors = attributes[attr]
+    assert isinstance(flavors, dict)
+    for flavor in flavors:
+      n = flavors[flavor]
+      col += [flavor] * n
+    if not num_people:
+      num_people = len(col)
+      df['name'] = names.iloc[:num_people]
+    else:
+      if len(col) != num_people:
+        raise ValueError('Number of people must be the same for all attributes!') 
+    df[attr] = col
+
+  w = pd.ExcelWriter(f'{d}/alumni.xlsx')
+  df.to_excel(w, index=False)
+  w.save()
+  w.close()
+
+
+  
+
 
 
 class ZoomSesh:
@@ -61,6 +123,12 @@ class ZoomSesh:
       raise FileNotFoundError(f"No alumni file found! Please make sure to include 'alumni.xlsx' in {session_directory}")
       
     alumni_file = os.path.join(session_directory, ALUMNI_FILE)
+    self._breakout_file = os.path.join(session_directory, 'breakouts.json')  # To save non-sensitive breakout data
+    if not os.path.exists(self._breakout_file):
+      # Save blank breakout file
+      with open(self._breakout_file, 'w') as f:
+        json.dump({}, f)
+        
     self._session_directory = session_directory
     self._alumni_data = pd.read_excel(alumni_file) # DataFrame with raw data from alumni file
 
@@ -150,61 +218,66 @@ class ZoomSesh:
     self._breakout_history.append(breakout_dict)
     self._alumni_history.append(self._alumni_data.copy())
     if autosave:
-      self.save_breakout(len(self._breakout_history))
+      self._save_breakout(len(self._breakout_history))
     return breakout_dict
 
 
   # TODO: Fill out this docstring
   def _min_combo(self, alumni, by=None, arg=None, group_size=6):
-    '''Creates a random group that minimizes overlap with alumni in previous breakouts.    
-
-    Args:
-      alumni: 
-      by:
-      arg:
-      group_size:
-
-    Returns:
-      combos: a tuple of alumni indices for this group
-    '''
-
-    logging.log('Begin _min_combo <========================================')
-    logging.log(f'size={len(alumni)}, by="{by}", arg="{arg}", group_size={group_size}')
-
-    if by == 'all' or arg == 'diff':
+    filter_combos_for_diversity = False
+    if by == 'all': # 'diff' is irrelevant, so we don't have to filter combos
       indices = alumni.index
     else:
-      indices = alumni[alumni[by] == arg].index
+      if arg == 'diff':
+        filter_combos_for_diversity = True
+        indices = alumni.index
+      else:
+        indices = alumni[alumni[by] == arg].index
 
-    combos = list(combinations(indices,group_size))
+    n_attrs = len(self.attributes) 
+    counts_cols = [col for col in alumni.columns[n_attrs:] if '_' not in col]
+    cnsctv_cols = [col for col in alumni.columns[n_attrs:] if '_' in col]
+  
+    counts_arr = alumni[counts_cols].values
+    cnsctv_arr = alumni[cnsctv_cols].values
 
-    #!!! Current diff is only for year OR track. Full diff (each group member has different year and different track) not implemented yet
-    if arg == 'diff':
-      diff_start = timer()
-      temp_combos = []
-      for combo in combos:
-        vals = alumni.loc[alumni.index.isin(combo),by]
-        if len(vals) == len(set(vals)):
-          temp_combos.append(combo)
-      if len(temp_combos) == 0:
-        return 1    
-      combos = temp_combos
-      diff_end = timer()
-      logging.log(f'Diff time: {diff_end-diff_start}')
+    # Stack the two arrays side-by-side, giving a shape (N, N*2) where N is
+    # the number of students. 
+    alumni_arr = np.concatenate([counts_arr, cnsctv_arr], axis=1) 
 
-    twoDmask = [[(str(alumn), str(alumn)+'_cnsctv') for alumn in combos[i]] for i in range(len(combos))]
-    masks = [[item for combo in twoDmask[i] for item in combo] for i in range(len(twoDmask))]
+    @jit(nopython=True, cache=True)
+    def is_combo_diverse(combo, col, threshold):
+      num_unique_combo = len(np.unique(col[combo]))
 
-    start = timer()
-    sums = [np.sum(alumni.loc[alumni.index.isin(combos[i]),masks[i]].values) for i in range(len(combos))] ### HIGHEST COST STEP
-    end = timer()
+      if num_unique_combo < threshold:
+        return False
+      return True
 
-    logging.log(f'Time through highest cost step: {end-start}')
-    logging.log('End _min_combo ========================================>')
+    @jit(nopython=True, cache=True)
+    def get_sum(arr, combo):
+      counts_sum = arr[combo][: , combo]
+      cnsctv_sum = arr[combo][:, combo + len(arr)]
+      return np.sum(counts_sum) + np.sum(cnsctv_sum)
+
+    
+    combos = combinations(indices, group_size)
+    combo_arr = np.array(list(combos), dtype='int8')
+
+    if combo_arr.size == 0:
+      return 1
+
+    if filter_combos_for_diversity:
+      col = alumni[by].values.astype(str)
+      threshold = min(group_size, len(np.unique(col)))
+      good_combos = np.apply_along_axis(lambda combo: is_combo_diverse(combo, col, threshold), axis=1, arr=combo_arr)
+      combo_arr = combo_arr[np.where(good_combos)]
+
+    # Apply `get_sum` to each combo 
+    sums = np.apply_along_axis(lambda combo: get_sum(alumni_arr, combo), axis=1, arr=combo_arr)
 
     min_list = np.where(sums == np.amin(sums))[0]
-  
-    return combos[random.choice(min_list)]
+
+    return list(combo_arr[random.choice(min_list)])
 
     
 
@@ -286,16 +359,44 @@ class ZoomSesh:
 
   # Output and display funcs
   # ====================================================
-  def save_breakout(self, i):
+  def _save_breakout(self, i):
+    '''Saves breakout groups to Excel and breakout dict as json
+
+    Args: 
+      i: breakout number
+    '''
+
     if i > len(self._breakout_history):
       raise ValueError(f"Breakout {i} doesn't exist!")
 
     b = self._breakout_history[i - 1]
+
+    # Read current breakouts into memory
+    with open(self._breakout_file, 'r') as current:
+      breakouts = json.load(current)
+      
+    # Add new breakout and write back to disk. Note that this operation overwrites
+    # the current breakout of the same name
+    breakouts[f'breakout{i}'] = list(b)
+    with open(self._breakout_file, 'w') as f:
+      json.dump(breakouts, f, indent=2)
     
-    writer = pd.ExcelWriter(os.path.join(self._session_directory, f'breakout{i}.xlsx'), engine='openpyxl')
-    for group in b:
+    # Save breakout to excel
+    excel_fname = os.path.join(self._session_directory, 'breakouts.xlsx')
+    if os.path.exists(excel_fname):
+      book = openpyxl.load_workbook(excel_fname)
+      writer = pd.ExcelWriter(excel_fname, engine='openpyxl', mode='a')
+      writer.book = book
+      writer.sheets = dict((ws.title, ws) for ws in book.worksheets)
+    else:
+      writer = pd.ExcelWriter(excel_fname, engine='openpyxl')
+
+    row = (i - 1) * (max([len(group) for group in b.values()]) + 2)
+    for n, group in enumerate(b):
+      col = n * (1 + len(self.attributes))
       df = self._alumni_data[self.attributes].iloc[b[group]]
-      df.to_excel(writer, sheet_name=group)
+      df.index.name = group
+      df.to_excel(writer, sheet_name='breakouts', startrow=row, startcol=col)
     
     writer.save()
     writer.close()
