@@ -377,7 +377,7 @@ class ZoomSesh:
       
     # Add new breakout and write back to disk. Note that this operation overwrites
     # the current breakout of the same name
-    breakouts[f'breakout{i}'] = b
+    breakouts[f'breakout{i}'] = list(b)
     with open(self._breakout_file, 'w') as f:
       json.dump(breakouts, f, indent=2)
     
