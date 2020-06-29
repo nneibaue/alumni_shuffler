@@ -388,7 +388,6 @@ class ZoomSesh:
     row = (i - 1) * (max([len(group) for group in b.values()]) + 2)
     for n, group in enumerate(b):
       col = n * (1 + len(self.attributes))
-      print('col', col)
       df = self._alumni_data[self.attributes].iloc[b[group]]
       df.index.name = group
       df.to_excel(writer, sheet_name='breakouts', startrow=row, startcol=col)
