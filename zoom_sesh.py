@@ -168,8 +168,9 @@ class ZoomSesh:
       else:
         indices = alumni[alumni[by] == arg].index
 
-    counts_cols = [col for col in alumni.columns[3:] if '_' not in col]
-    cnsctv_cols = [col for col in alumni.columns[3:] if '_' in col]
+    n_attrs = len(self.attributes) 
+    counts_cols = [col for col in alumni.columns[n_attrs:] if '_' not in col]
+    cnsctv_cols = [col for col in alumni.columns[n_attrs:] if '_' in col]
   
     counts_arr = alumni[counts_cols].values
     cnsctv_arr = alumni[cnsctv_cols].values
