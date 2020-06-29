@@ -8,6 +8,7 @@ from html_maker import HtmlMaker
 import aslogging as logging
 import shutil
 import json
+import openpyxl
 
 COLAB_ROOT = '/content'
 ALUMNI_FILE = 'alumni.xlsx'
@@ -375,11 +376,22 @@ class ZoomSesh:
       json.dump(breakouts, f, indent=2)
     
     # Save breakout to excel
-    excel_fname = os.path.join(self._session_directory, 'breakout{i}.xlsx')
-    writer = pd.ExcelWriter(excel_fname.format(i=i, ext='xlsx'), engine='openpyxl')
-    for group in b:
+    excel_fname = os.path.join(self._session_directory, 'breakouts.xlsx')
+    if os.path.exists(excel_fname):
+      book = openpyxl.load_workbook(excel_fname)
+      writer = pd.ExcelWriter(excel_fname, engine='openpyxl', mode='a')
+      writer.book = book
+      writer.sheets = dict((ws.title, ws) for ws in book.worksheets)
+    else:
+      writer = pd.ExcelWriter(excel_fname, engine='openpyxl')
+
+    row = (i - 1) * (max([len(group) for group in b.values()]) + 2)
+    for n, group in enumerate(b):
+      col = n * (1 + len(self.attributes))
+      print('col', col)
       df = self._alumni_data[self.attributes].iloc[b[group]]
-      df.to_excel(writer, sheet_name=group)
+      df.index.name = group
+      df.to_excel(writer, sheet_name='breakouts', startrow=row, startcol=col)
     
     writer.save()
     writer.close()

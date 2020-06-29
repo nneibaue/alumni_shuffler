@@ -131,8 +131,7 @@ def test_breakout_files_exist():
       z.breakout('track', 2)
 
     time.sleep(1)  # Make sure files finish saving
-    expected_files = [ 'alumni.xlsx', 'breakout1.xlsx', 'breakout2.xlsx',
-    'breakout3.xlsx', 'breakout4.xlsx', 'breakout5.xlsx', 'breakouts.json']
+    expected_files = ['alumni.xlsx', 'breakouts.xlsx', 'breakouts.json']
     actual_files = os.listdir(d)
     for file in expected_files:
       assert file in actual_files
