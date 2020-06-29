@@ -1,3 +1,4 @@
+from numba import jit
 import pandas as pd
 import numpy as np
 import random
@@ -223,55 +224,60 @@ class ZoomSesh:
 
   # TODO: Fill out this docstring
   def _min_combo(self, alumni, by=None, arg=None, group_size=6):
-    '''Creates a random group that minimizes overlap with alumni in previous breakouts.    
-
-    Args:
-      alumni: 
-      by:
-      arg:
-      group_size:
-
-    Returns:
-      combos: a tuple of alumni indices for this group
-    '''
-
-    logging.log('Begin _min_combo <========================================')
-    logging.log(f'size={len(alumni)}, by="{by}", arg="{arg}", group_size={group_size}')
-
-    if by == 'all' or arg == 'diff':
+    filter_combos_for_diversity = False
+    if by == 'all': # 'diff' is irrelevant, so we don't have to filter combos
       indices = alumni.index
     else:
-      indices = alumni[alumni[by] == arg].index
+      if arg == 'diff':
+        filter_combos_for_diversity = True
+        indices = alumni.index
+      else:
+        indices = alumni[alumni[by] == arg].index
 
-    combos = list(combinations(indices,group_size))
+    n_attrs = len(self.attributes) 
+    counts_cols = [col for col in alumni.columns[n_attrs:] if '_' not in col]
+    cnsctv_cols = [col for col in alumni.columns[n_attrs:] if '_' in col]
+  
+    counts_arr = alumni[counts_cols].values
+    cnsctv_arr = alumni[cnsctv_cols].values
 
-    #!!! Current diff is only for year OR track. Full diff (each group member has different year and different track) not implemented yet
-    if arg == 'diff':
-      diff_start = timer()
-      temp_combos = []
-      for combo in combos:
-        vals = alumni.loc[alumni.index.isin(combo),by]
-        if len(vals) == len(set(vals)):
-          temp_combos.append(combo)
-      if len(temp_combos) == 0:
-        return 1    
-      combos = temp_combos
-      diff_end = timer()
-      logging.log(f'Diff time: {diff_end-diff_start}')
+    # Stack the two arrays side-by-side, giving a shape (N, N*2) where N is
+    # the number of students. 
+    alumni_arr = np.concatenate([counts_arr, cnsctv_arr], axis=1) 
 
-    twoDmask = [[(str(alumn), str(alumn)+'_cnsctv') for alumn in combos[i]] for i in range(len(combos))]
-    masks = [[item for combo in twoDmask[i] for item in combo] for i in range(len(twoDmask))]
+    @jit(nopython=True, cache=True)
+    def is_combo_diverse(combo, col, threshold):
+      num_unique_combo = len(np.unique(col[combo]))
 
-    start = timer()
-    sums = [np.sum(alumni.loc[alumni.index.isin(combos[i]),masks[i]].values) for i in range(len(combos))] ### HIGHEST COST STEP
-    end = timer()
+      if num_unique_combo < threshold:
+        return False
+      return True
 
-    logging.log(f'Time through highest cost step: {end-start}')
-    logging.log('End _min_combo ========================================>')
+    @jit(nopython=True, cache=True)
+    def get_sum(arr, combo):
+      counts_sum = arr[combo][: , combo]
+      cnsctv_sum = arr[combo][:, combo + len(arr)]
+      return np.sum(counts_sum) + np.sum(cnsctv_sum)
+
+    
+    combos = combinations(indices, group_size)
+    combo_arr = np.array(list(combos), dtype='int8')
+
+    if combo_arr.size == 0:
+      return 1
+
+    if filter_combos_for_diversity:
+      col = alumni[by].values.astype(str)
+      threshold = min(group_size, len(np.unique(col)))
+      good_combos = np.apply_along_axis(lambda combo: is_combo_diverse(combo, col, threshold), axis=1, arr=combo_arr)
+      combo_arr = combo_arr[np.where(good_combos)]
+
+    # Apply `get_sum` to each combo 
+    sums = np.apply_along_axis(lambda combo: get_sum(alumni_arr, combo), axis=1, arr=combo_arr)
 
     min_list = np.where(sums == np.amin(sums))[0]
-  
-    return combos[random.choice(min_list)]
+
+    return list(combo_arr[random.choice(min_list)])
 
     
 
